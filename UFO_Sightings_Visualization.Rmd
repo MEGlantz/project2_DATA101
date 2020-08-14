@@ -28,7 +28,7 @@ Are there any trends in UFO sightings over time? Do they tend to be clustered or
 Do clusters of UFO sightings correlate with landmarks, such as airports or government research centers?
 What are the most common UFO descriptions?
 
-We decided to look at the data and formulate our own questions, many of which coincide with what the compilers laid out. I will be exploring two questions:  1) are sightings clustered in time; and 2) are there more sightings in certain countries and in areas of those countries.
+We decided to look at the data and formulate our own questions, many of which coincide with what the compilers laid out. I will be exploring two questions:  1) are sightings clustered in time; and 2) are there more sightings in certain countries and in areas of those countries.   
 
 #### Acknowledgement
 This dataset was scraped, geolocated, and time standardized from NUFORC data by Sigmond Axel \here <em>https://github.com/planetsig/ufo-reports</em>.  We accessed it from kaggle \here <em>https://www.kaggle.com/NUFORC/ufo-sightings?select=scrubbed.csv</em>.
