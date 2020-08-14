@@ -1,0 +1,302 @@
+---
+title: "UFO Sightings -- Visualization"
+author: "Mary Glantz"
+date: "8/18/2020"
+output:
+  html_document: default
+  word_document: default
+  pdf_document: default
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+
+## Context
+This dataset contains over 80,000 reports of UFO sightings over the last century.
+
+## Content
+This dataset includes 80,332 rows and 11 columns.  The columns represent the date/time of the sighting, the location (city, state and country) of the sighting, the shape of the object, the duration (in hours/minutes/seconds) of the sighting, comments describing the sighting, the date posted, and the latitude and longitude of the sighting.  The reports date back to the 20th century, some older data might be obscured. 
+
+The reports come from the National UFO Reporting Center's (NUFORC's) website. Further information on NUFORC and up-to-date datasets are available here:  <em>http://www.nuforc.org/</em>. 
+
+## Questions
+The data compilers suggested the following questions:
+What areas of the country are most likely to have UFO sightings?
+Are there any trends in UFO sightings over time? Do they tend to be clustered or seasonal?
+Do clusters of UFO sightings correlate with landmarks, such as airports or government research centers?
+What are the most common UFO descriptions?
+
+We decided to look at the data and formulate our own questions, many of which coincide with what the compilers laid out. I will be exploring two questions:  1) are sightings clustered in time; and 2) are there more sightings in certain countries and in areas of those countries.
+
+#### Acknowledgement
+This dataset was scraped, geolocated, and time standardized from NUFORC data by Sigmond Axel \here <em>https://github.com/planetsig/ufo-reports</em>.  We accessed it from kaggle \here <em>https://www.kaggle.com/NUFORC/ufo-sightings?select=scrubbed.csv</em>.
+
+```{r}
+# load tidyverse to read in data
+
+library(tidyverse)
+ufo_sightings <- read_csv("scrubbed.csv")
+```
+
+Examine the parsing errors
+
+```{r}
+errors <- ufo_sightings[c(27823, 35693, 43783, 58592), ]
+errors
+```
+
+These have errors because in three cases the description of the duration in seconds is missing, and, in one case, because the latitude is missing.  
+
+We should delete the one missing latitude before mapping the data points; if we need to work with the duration, we should decide whether to estimate a value for "a few seconds" or if we should just delete that entry.  
+
+We can repair the seconds in two of the other three because it is written in the duration (hours/min) column.
+
+```{r}
+ufo_sightings[35693, 6] <- 8
+ufo_sightings[58592, 6] <- .5
+
+ufo_sightings[c(35693, 58592), ]
+```
+
+
+##### Code to change datetime format
+
+To more easily work with the dates and times in our data, we will convert the datetime column from "character" format to "datetime" format using the lubridate package.
+
+
+```{r}
+library(lubridate)
+
+# convert the "datetime" column into date format from character format
+newufo <- mutate(ufo_sightings, datetime = mdy_hm(ufo_sightings$datetime))
+
+
+```
+
+
+To see patterns by date and by time, we create separate columns for years, months,  hours and minutes (of sighting).
+
+#### Code to create new "year" and "month" columns
+```{r}
+newufo <- mutate(newufo, year = year(datetime))
+newufo <- mutate(newufo, month = month(datetime, label = TRUE))
+newufo <- mutate(newufo, hour = hour(datetime))
+newufo <- mutate(newufo, minute = minute(datetime))
+
+
+```
+
+
+
+The dataset already includes columns for city, state, and country, so there is no need to change the table to reflect those values.
+
+
+## Time Patterns
+
+The quickest way to see if there is a pattern to the years when sightings took place is to draw a histogram.
+
+#### Drawing a histogram of sightings per year
+```{r}
+ggplot(data = newufo, mapping = aes(x = year)) + geom_histogram(bins = 100, fill = "blue") + ggtitle("Annual Reported UFO Sightings Worldwide")
+```
+
+Here we can see that reports of ufo sightings increase as we move closer in time to the present.
+
+
+
+To see if there is a pattern to the time of year sightings are reported, we can draw a histogram of months.
+
+#### Drawing a bar graph of sightings per month
+```{r}
+ggplot(data = newufo, mapping = aes(x = month)) + geom_bar(fill = "red") + ggtitle("Reported UFO Sightings per Month Worldwide")
+```
+
+Sightings seem to occur more often in June through September, and decline during the other monthsv.
+
+
+Now we will get the mean and median values for how many sightings are reported per month, and then filter out the months which are above the mean and above the median.
+
+#### Code for mean, median and for selecting those months greater than the mean and median
+```{r}
+permonth <- count(newufo, month)
+avgsighthings <- mean(permonth$n)
+mediansightings <- median(permonth$n)
+highmonths <- filter(permonth, permonth$n > avgsighthings)
+highmonthsbymedian <- filter(permonth, permonth$n > mediansightings)
+
+
+ggplot(data = highmonths, mapping = aes(x = month, y = n)) + geom_bar(stat = "identity", fill = "blue") + labs(y = "Count", x = "Month") + ggtitle("Months with Above Mean Number of Reported UFO Sightings", subtitle = "Worldwide")
+
+ggplot(data = highmonthsbymedian, mapping = aes(x = month, y = n)) + geom_bar(stat = "identity", fill = "purple") + labs(y = "Count", x = "Month") + ggtitle("Months with Above Median Number of Reported UFO Sightings",  subtitle = "Worldwide")
+
+```
+
+The second half of the year features more sightings per month than the first half.
+
+## Geographical Patterns
+
+Some country names are not available or listed.  A quick check of not-available (NA) values, shows that 9670 entries lack a country identifier.  (That leaves 70662 entries that do have a country.) With a fairly large number of NA's, it is worth looking at what those are.  By filtering them out and scanning the head and tail of the entries, it is clear that many entries that lack a country do have a state listed.  Some of those "states" are Canadian provinces, but the majority are US states simply lacking a country identifier.  
+
+
+#### Analyzing the NA entries
+```{r}
+missingcountry <- newufo %>% filter( is.na(country))
+
+missingcountry_notUS <- missingcountry %>% filter(is.na(state))
+
+
+
+```
+
+
+Plotting the data missing both a country and state identifier on a map using latitude and longitude shows where most of these missing data are actually from.  
+
+![*Map of Sightings with Neither State nor Country Identified*](images/missingcountrynotUS Sightings.png)
+
+
+It is obvious from this map that we have now located most of our missing non-English-speaking countries.  In addition, it is apparent that much of the data missing both a state and a country is still data from the United States.
+
+Plotting these world-wide points over time reveals a very similar pattern to all the other data.  Reports increase dramatically in the 2000s.
+
+```{r}
+ggplot(missingcountry_notUS, mapping = aes(x = year)) + geom_histogram(bins = 100, fill = "blue") + ggtitle("Reported UFO Sightings Lacking both a State and Country Identifier")
+```
+
+
+
+
+Analyzing the data only from sightings with a valid country field, there are five countries that have reported UFO sightings.  The US is by far the most common source of reports.  
+
+#### Code for counting number of sightings (n) per country
+```{r}
+countrysightings <- newufo %>% filter(!is.na(country))
+countrysightings %>% count(country)
+ggplot(data = countrysightings, mapping = aes(x = country)) + geom_bar(mapping = aes(fill = country)) + ggtitle("Reported UFO Sightings with Counry Identified") + theme(axis.ticks.x = element_blank()) + scale_x_discrete( breaks=c("au","ca","de", "gb", "us"),
+    labels=c("Australia", "Canada", "Germany", "Great Britain", "United States")) + labs(y = "Count", x = "Country") + guides(fill=FALSE)
+    
+
+```
+```{r}
+USsightings <- newufo %>% filter(country == "us")
+UKsightings <- newufo %>% filter(country == "gb")
+Canadasightings <- newufo %>% filter(country == "ca")
+
+```
+
+Mapping the location of reported sightings in the United States does not reveal any discernible pattern.  They appear to be reported from all over the continental United States and from populated parts of Alaska and Hawaii.
+
+![*Map of Sightings in the United States*](images/US sightings.png)
+
+
+The situation is similar for both the United Kingdom and Canada.  (The code for creating these maps is at the bottom of this document.)
+
+
+![*Map of Sightings in the United Kingdom*](images/UK Sightings.png)
+
+
+
+
+![*Map of Sightings in Canada*](images/Canada Sightings.png)
+
+```{r}
+ggplot(data = countrysightings, mapping = aes(x = year, y = country)) + geom_point(mapping = aes(color = month)) + ggtitle("Reported UFO Sightings by Country, Year, and Month", subtitle = "Reports with country identified") + labs(y = "Country", x = "Year") + scale_y_discrete( breaks=c("au","ca","de", "gb", "us"),
+    labels=c("Australia", "Canada", "Germany", "Great Britain", "United States")) 
+```
+The above graph is not particularly helpful, as it does not show how many sightings there were per year in each country, but the use of color to indicate months of sightings does give you the impression that there is at least a slight difference in the most common months for reported sightings in Australia and the United States and Canada.  
+
+```{r}
+ggplot(data = countrysightings) + geom_histogram(mapping = aes(x = year, fill = month), bins = 100) + facet_wrap(~country ) + ggtitle("Reported UFO Sightings in Each Country by Month and Year") 
+```
+
+These faceted graphs give you a better impression of the annual monthly variation of sightings in each country.
+
+
+### Why Germany?
+
+Interestingly, all but 105 of the sightings with identified countries were reported in English-speaking countries.  It is probably worth exploring the reports from Germany to see if there is an explanation for why it is the only non-English speaking country in this data.
+
+
+```{r}
+
+germanysightings <- countrysightings %>% filter(country == "de")
+
+```
+
+There is no immediate pattern apparent in the Germany sightings.  Some of the sightings are at locations of US military bases, so that may explain some of the reports.  At least one of the comments, however, is written in French, suggesting it was not written by an American servicemember.
+
+![*Map of Sightings in Germany*](images/Germany Sightings.png)
+
+
+By examining the year column, we can see if there is a pattern to the time period these were reported.
+
+
+#### Code counting the sightings (n) per year in Germany
+```{r}
+germanysightings %>% count(year)
+ggplot(data = germanysightings, mapping = aes(x = year)) + geom_histogram(bins = 60, fill = "blue") + ggtitle("Reported UFO Sightings in Germany by Year") + labs(y = "Count", x = "Year")
+```
+
+This histogram shows the sightings were fairly evenly spread out (with 1 or 2 every couple years) until the 2000s when the numbers increased, reaching an anomalous high of 15 in 2008.  The increase into the 2000s tracks with what we saw with the overall increase in reports of UFO sightings worldwide in the late 1990s and 2000s.
+
+### Difference between Northern and Southern Hemispheres?
+
+The overall data showed the majority of sightings took place between June and November, summer and autumn in the northern hemisphere.  Does this hold true for the sightings reported from Australia in the southern hemisphere:
+
+
+![*Map of Sightings in Australia*](images/Australia Sightings.png)
+
+
+#### Code pulling out sightings per month in Australia
+```{r}
+australiasightings <- countrysightings %>% filter(country == "au")
+australiasightings %>% count(month)
+ggplot(data = australiasightings, mapping = aes(x = month)) + geom_bar(fill = "purple") + labs(y = "Count", x = "Month") + ggtitle("Reported UFO Sightings in Australia by Month")
+```
+
+Calculating the mean and the median for number of sightings per month, we can see which months are higher than average and median.
+
+
+#### Code calculating the mean, median and months above the mean and median in Australia.
+```{r}
+permonthAU <- count(australiasightings, month)
+avgsighthingsAU <- mean(permonthAU$n)
+mediansightingsAU <- median(permonthAU$n)
+highmonthsAU <- filter(permonthAU, permonthAU$n > avgsighthingsAU)
+highmonthsbymedianAU <- filter(permonthAU, permonthAU$n > mediansightingsAU)
+
+
+ggplot(data = highmonthsAU, mapping = aes(x = month, y = n)) + geom_bar(stat = "identity", fill = "blue") + labs(y = "Count", x = "Month") + ggtitle("Months with Above Mean Number of Reported UFO Sightings", subtitle = "Australia")
+
+ggplot(data = highmonthsbymedianAU, mapping = aes(x = month, y = n)) + geom_bar(stat = "identity", fill = "purple") + labs(y = "Count", x = "Month") + ggtitle("Months with Above Median Number of Reported UFO Sightings", subtitle = "Australia")
+```
+
+
+The monthly pattern in the southern hemisphere appears to be opposite that in the northern hemisphere.  The months with the most sightings are January through June -- southern hemisphere summer and fall.  Thus, it seems that UFO sightings are reported most often in the summer and fall in both hemispheres.
+
+Possible explanations for this are that there are more people outside in the summer to see and report UFOs or, of course, that extra-terrestrial beings prefer to visit Earth (or at least the English-speaking parts of Earth and Germany) during the summer season.  
+
+
+
+CODE for creating maps:
+
+> mapview(australiasightings, xcol = "longitude", ycol = "latitude", crs = 4326, grid = FALSE, alpha = 0, legend= FALSE)
+
+> mapview(germanysightings, xcol = "longitude", ycol = "latitude", crs = 4326, grid = FALSE, alpha = 0, legend= FALSE)
+
+> mapview(missingcountry_notUS, xcol = "longitude", ycol = "latitude", crs = 4326, grid = FALSE, legend= FALSE)
+
+> USsightings <- newufo %>% filter(country == "us")
+
+> mapview(USsightings, xcol = "longitude", ycol = "latitude", crs = 4326, grid = FALSE, legend= FALSE)
+
+> USsightings <- newufo %>% filter(country == "us")
+
+> UKsightings <- newufo %>% filter(country == "gb")
+
+> Canadasightings <- newufo %>% filter(country == "ca")
+
+> mapview(UKsightings, xcol = "longitude", ycol = "latitude", crs = 4326, grid = FALSE, legend= FALSE)
+
+> mapview(Canadasightings, xcol = "longitude", ycol = "latitude", crs = 4326, grid = FALSE, legend= FALSE)
