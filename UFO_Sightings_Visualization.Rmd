@@ -207,7 +207,7 @@ ggplot(data = countrysightings, mapping = aes(x = year, y = country)) + geom_poi
 The above graph is not particularly helpful, as it does not show how many sightings there were per year in each country, but the use of color to indicate months of sightings does give you the impression that there is at least a slight difference in the most common months for reported sightings in Australia and the United States and Canada.  
 
 ```{r}
-ggplot(data = countrysightings) + geom_histogram(mapping = aes(x = year, fill = month), bins = 100) + facet_wrap(~country ) + ggtitle("Reported UFO Sightings in Each Country by Month and Year") 
+ggplot(data = countrysightings) + geom_histogram(mapping = aes(x = year, fill = month), bins = 100) + facet_wrap(~country ) + ggtitle("Reported UFO Sightings in Each Country by Month and Year") + scale_x_continuous(trans = "log10")
 ```
 
 These faceted graphs give you a better impression of the annual monthly variation of sightings in each country.
